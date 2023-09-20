@@ -1,4 +1,6 @@
+#%%
 import numpy as np
+import random
 
 from PIL import Image
 
@@ -10,6 +12,8 @@ text4 = Image.open("textures_data/text4.png")
 text5 = Image.open("textures_data/text5.png")
 text6 = Image.open("textures_data/text6.png")
 
+#%%
+
 #text0.show()
 #text1bis = np.array(text1)
 #print(text1bis.shape)
@@ -17,6 +21,11 @@ text6 = Image.open("textures_data/text6.png")
 # faire une fonction qui prenne en entree une image couleur ou grayscale
 # donc tester le nombre de channel et traiter l'image en fonction
 # Paramètres : (Ismp, size_final, taille_patch (doit etre impair), epsilon)
+# Définir une fonction pour calculer la similarité entre deux patches
+def patch_similarity(patch1, patch2, epsilon):
+    diff = np.abs(patch1.astype(np.float32) - patch2.astype(np.float32))
+    diff = np.sum(diff) / (patch1.shape[0] * patch1.shape[1] * patch1.shape[2])
+    return diff < epsilon
 
 def random_patch(Ismp, size_patch):
     Ismp = np.array(Ismp)
@@ -26,34 +35,70 @@ def random_patch(Ismp, size_patch):
     patch = Ismp[random_x:random_x + size_patch, random_y:random_y + size_patch]
     return patch
 
+def extract_patch(image, size, i_centre, j_centre):
+    patch = np.zeros((size, size))
+    for i in range(i_centre - int(size/2), i_centre + int(size/2)):
+        for j in range(j_centre - int(size/2), j_centre + int(size/2)):
+            patch[i - (i_centre - int(size/2)), j - (j_centre - int(size/2))] = image[i,j]
+    return patch
+
 #Efros-Leung :
 # Ismp : Image de texture qu' on utilise
 # size_final : taille finale de l' image générée
 # size_patch : la taille des patch que l'on utilisera (reste impair)
 # epsilon : coef pour definir a quel point l'echantillon observé peut varier de son sample
 def efros_leung(Ismp, size_final, size_patch, epsilon):
-    image_result = np.uint8(np.full((size_final, size_final,3),-1))
+    #image_result = np.uint8(np.full((size_final, size_final,3),-1))
+    image_result = np.full((size_final, size_final, 3), -1, dtype=np.int32)
+    Ismp = np.array(Ismp)
+    random.seed()
     new_patch_random = random_patch(Ismp, size_patch)
     # Trouver le milieu de image_vide
     milieu = (int(size_final/2), int(size_final/2))
     # Coller le patch au milieu de image_vide en gardant les contours inchangés
     image_result[milieu[0] - int(size_patch/2):milieu[0] + int(size_patch/2), milieu[1] - int(size_patch/2):milieu[1] + int(size_patch/2)] = new_patch_random
     #Trouver le pixel de image_result qui possède le plus de voisins non vides
-    
+    #Pour chaque pixel de image_result, on regarde si il est vide ou non
+    max_voisins = -1
+    max_i = -1
+    max_j = -1
+    for i in range(size_final):
+        for j in range(size_final):
+            if image_result[i,j,0] == -1:
+                #On regarde si il y a des voisins non vides
+                voisins = []
+                for k in range(i-1,i+1):
+                    for l in range(j-1, j+1):
+                        if k >= 0 and k < size_final and l >= 0 and l < size_final:
+                            if image_result[k,l,0] != -1:
+                                voisins.append((k,l))
+                #On choisit un voisin au hasard
+                if len(voisins) > max_voisins:
+                    max_i = i
+                    max_j = j
+                '''if len(voisins) != 0:
+                    random_voisin = random.choice(voisins)
+                    #On trouve les patches similaires au patch du voisin
+                    patches_similaires = []
+                    for k in range(Ismp.shape[0] - size_patch):
+                        for l in range(Ismp.shape[1] - size_patch):
+                            if patch_similarity(Ismp[k:k+size_patch,l:l+size_patch], image_result[random_voisin[0]-int(size_patch/2):random_voisin[0]+int(size_patch/2),random_voisin[1]-int(size_patch/2):random_voisin[1]+int(size_patch/2)], epsilon):
+                                patches_similaires.append((k,l))
+                    #On choisit un patch similaire au hasard
+                    if len(patches_similaires) != 0:
+                        random_patch_similaire = random.choice(patches_similaires)
+                        image_result[i,j] = Ismp[random_patch_similaire[0],random_patch_similaire[1]]'''
                 
+    patch_pixel = extract_patch(image_result, size_patch, i, j)
+    # Parcourir tous les pixels de l'image de textures pour comparer avec le patch_pixel
 
-                        
-    
+    # Remplir un tableau Omega' avec les meilleurs résultats de corrélation
 
-
-    # On prend un patch au hasard dans l'image
-    # On cherche les patches similaires dans l'image
-    # On en prend un au hasard parmi les patches similaires
-    # On le colle sur l'image finale
-    # On recommence jusqu'à remplir l'image finale
+                    
+    return image_result
     
 final = efros_leung(text0, 100, 10, 0.1)
-final = Image.fromarray(final)
+final = Image.fromarray(final.astype('uint8'))
 final.show()
 
 # 1) On prend un patch au hasard dans l'image
