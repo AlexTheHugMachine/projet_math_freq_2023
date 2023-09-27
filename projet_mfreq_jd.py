@@ -61,19 +61,9 @@ def extract_patch(image, size, i_centre, j_centre):
     for i in range(-offset, offset):
         for j in range(-offset, offset):
             patch[offset + j, offset + i] = image[int(j_centre + j), int(i_centre + i)]
-            '''print("---------")
-            print(image[int(j_centre + j), int(i_centre + i)])
-            print(patch[offset + j, offset + i])'''
     return patch
 
-#Efros-Leung :
-# Ismp : Image de texture qu' on utilise
-# size_final : taille finale de l' image générée
-# size_patch : la taille des patch que l'on utilisera (reste impair)
-# epsilon : coef pour definir a quel point l'echantillon observé peut varier de son sample
-def efros_leung(Ismp, size_final, size_patch, epsilon):
-    #image_result = np.uint8(np.full((size_final, size_final,3),-1))
-    nb_patchs_similaires = 0
+def image_initiale(Ismp, size_final, size_patch):
     image_result = np.full((size_final, size_final, 3), -1, dtype=np.int32)
     Ismp = np.array(Ismp)
     random.seed()
@@ -82,6 +72,23 @@ def efros_leung(Ismp, size_final, size_patch, epsilon):
     milieu = (int(size_final/2), int(size_final/2))
     # Coller le patch au milieu de image_vide en gardant les contours inchangés
     image_result[milieu[0] - int(size_patch/2):milieu[0] + int(size_patch/2), milieu[1] - int(size_patch/2):milieu[1] + int(size_patch/2)] = new_patch_random
+    return image_result
+
+#Efros-Leung :
+# Ismp : Image de texture qu' on utilise
+# size_final : taille finale de l' image générée
+# size_patch : la taille des patch que l'on utilisera (reste impair)
+# epsilon : coef pour definir a quel point l'echantillon observé peut varier de son sample
+def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
+    #image_result = np.uint8(np.full((size_final, size_final,3),-1))
+    #image_result = np.full((size_final, size_final, 3), -1, dtype=np.int32)
+    Ismp = np.array(Ismp)
+    #random.seed()
+    #new_patch_random = random_patch(Ismp, size_patch)
+    # Trouver le milieu de image_vide
+    #milieu = (int(size_final/2), int(size_final/2))
+    # Coller le patch au milieu de image_vide en gardant les contours inchangés
+    #image_result[milieu[0] - int(size_patch/2):milieu[0] + int(size_patch/2), milieu[1] - int(size_patch/2):milieu[1] + int(size_patch/2)] = new_patch_random
     #Trouver le pixel de image_result qui possède le plus de voisins non vides
     #Pour chaque pixel de image_result, on regarde si il est vide ou non
     max_voisins = -1
@@ -115,34 +122,30 @@ def efros_leung(Ismp, size_final, size_patch, epsilon):
                     if len(patches_similaires) != 0:
                         random_patch_similaire = random.choice(patches_similaires)
                         image_result[i,j] = Ismp[random_patch_similaire[0],random_patch_similaire[1]]'''
-    print("Indices ij pixel max voisin : ", max_i, ", ", max_j)            
+    #print("Indices ij pixel max voisin : ", max_i, ", ", max_j)            
     patch_pixel = extract_patch(image_result, size_patch, max_i, max_j)
-
     # Parcourir tous les pixels de l'image de textures pour comparer avec le patch_pixel
     offset = int((size_patch - 1)/2)
     omegap = []
-    print("Taille de la texture", Ismp.shape)
+    #print("Taille de la texture", Ismp.shape)
     for o in range(offset, Ismp.shape[0] - offset):
         for p in range(offset, Ismp.shape[1] - offset):
             patch_compare = extract_patch(Ismp, size_patch, o, p)
             if patch_similarity(patch_pixel, patch_compare, epsilon):
-                print("Patch similaire trouvé")
+                #print("Patch similaire trouvé")
                 omegap.append(patch_compare)
-
     if omegap != []:
         random_omegap = random.choice(omegap)
         #image_result[max_i - offset:max_i + offset, max_j - offset:max_j + offset] = random_omegap
         image_result[max_j, max_i] = random_omegap[offset + 1, offset + 1]
-
-
-                            
-
-    # Remplir un tableau Omega' avec les meilleurs résultats de corrélation
-
-                    
     return image_result
-    
-final = efros_leung(text0, 100, 10, 15)
+
+
+final = image_initiale(text0, 100, 10)
+final = efros_leung(text0, 100, 10, 15, final)
+for i in range (0, 10):
+    #probleme : y'a que 3 pixels
+    final = efros_leung(text0, 100, 10, 15, final)
 final = Image.fromarray(final.astype('uint8'))
 final.show()
 
