@@ -96,13 +96,14 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
     max_j = -1
     for i in range(size_final):
         for j in range(size_final):
-            if image_result[i,j,0] == -1:
+            #if image_result[i,j,0] == -1 :
+            if image_result[j,i,0] == -1 :
                 #On regarde si il y a des voisins non vides
                 voisins = []
                 for k in range(i-1,i+1):
                     for l in range(j-1, j+1):
                         if k >= 0 and k < size_final and l >= 0 and l < size_final:
-                            if image_result[k,l,0] != -1 :
+                            if image_result[l, k,0] != -1 :
                                 voisins.append((k,l))
                 #On choisit un voisin au hasard
                 if len(voisins) > max_voisins:
@@ -112,17 +113,19 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
                     #print(max_i, max_j)
                 '''if len(voisins) != 0:
                     random_voisin = random.choice(voisins)
-                    #On trouve les patches similaires au patch du voisin
+                    # On trouve les patches similaires au patch du voisin
                     patches_similaires = []
                     for k in range(Ismp.shape[0] - size_patch):
                         for l in range(Ismp.shape[1] - size_patch):
                             if patch_similarity(Ismp[k:k+size_patch,l:l+size_patch], image_result[random_voisin[0]-int(size_patch/2):random_voisin[0]+int(size_patch/2),random_voisin[1]-int(size_patch/2):random_voisin[1]+int(size_patch/2)], epsilon):
                                 patches_similaires.append((k,l))
-                    #On choisit un patch similaire au hasard
+                    # On choisit un patch similaire au hasard
                     if len(patches_similaires) != 0:
                         random_patch_similaire = random.choice(patches_similaires)
                         image_result[i,j] = Ismp[random_patch_similaire[0],random_patch_similaire[1]]'''
-    #print("Indices ij pixel max voisin : ", max_i, ", ", max_j)            
+
+    print("Indices ij pixel max voisin : ", max_i, ", ", max_j)  
+    print("Valeur pixel : ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0])        
     patch_pixel = extract_patch(image_result, size_patch, max_i, max_j)
     # Parcourir tous les pixels de l'image de textures pour comparer avec le patch_pixel
     offset = int((size_patch - 1)/2)
