@@ -27,7 +27,7 @@ def ssd_pixel(pixel1, pixel2):
 # donc tester le nombre de channel et traiter l'image en fonction
 # Paramètres : (Ismp, size_final, taille_patch (doit etre impair), epsilon)
 # Définir une fonction pour calculer la similarité entre deux patches
-def patch_similarity(patch1, patch2, epsilon):
+def patch_similarity(patch1, patch2):
     diffR = 0
     diffG = 0
     diffB = 0
@@ -35,17 +35,17 @@ def patch_similarity(patch1, patch2, epsilon):
     for i in range(patch1.shape[0]):
         for j in range(patch1.shape[1]):
             if patch1[i,j,0] != -1 and patch2[i,j,0] != -1:
-                '''diffR += ssd_pixel(patch1[i,j,0], patch2[i,j,0])
-                diffG += ssd_pixel(patch1[i,j,1], patch2[i,j,1])
-                diffB += ssd_pixel(patch1[i,j,2], patch2[i,j,2])'''
-                #print(patch1[i,j,0] - patch2[i,j,0])
                 diffR += abs(patch1[i,j,0] - patch2[i,j,0])
                 diffG += abs(patch1[i,j,1] - patch2[i,j,1])
                 diffB += abs(patch1[i,j,2] - patch2[i,j,2])
                 nbpix += 1
+    if nbpix == 0:
+        nbpix = 1
+    return ((diffR/nbpix) + (diffG/nbpix) + (diffB/nbpix)) / 3
+    '''
     if diffR/nbpix < epsilon and diffG/nbpix < epsilon and diffB/nbpix < epsilon:
         return True
-    else: return False
+    else: return False'''
 
 def random_patch(Ismp, size_patch):
     Ismp = np.array(Ismp)
@@ -57,10 +57,11 @@ def random_patch(Ismp, size_patch):
 
 def extract_patch(image, size, i_centre, j_centre):
     patch = np.full((size, size, 3), -1, dtype=np.int32)
-    offset = int((size - 1)/2)
+    offset = int(size/2)
     for i in range(-offset, offset):
         for j in range(-offset, offset):
-            patch[offset + j, offset + i] = image[int(j_centre + j), int(i_centre + i)]
+            if i_centre + i >= 0 and i_centre + i < image.shape[0] and j_centre + j >= 0 and j_centre + j < image.shape[1]:
+                patch[offset + j, offset + i] = image[j_centre + j, i_centre + i]
     return patch
 
 def image_initiale(Ismp, size_final, size_patch):
@@ -96,7 +97,8 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
     max_j = -1
     for i in range(size_final):
         for j in range(size_final):
-            #if image_result[i,j,0] == -1 :
+            #if [j, i] not in no_liste:
+            # Creer une image de booleen pour savoir lequel est rempli
             if image_result[j,i,0] == -1 :
                 #On regarde si il y a des voisins non vides
                 voisins = []
@@ -111,44 +113,50 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
                     max_i = i
                     max_j = j
                     #print(max_i, max_j)
-                '''if len(voisins) != 0:
-                    random_voisin = random.choice(voisins)
-                    # On trouve les patches similaires au patch du voisin
-                    patches_similaires = []
-                    for k in range(Ismp.shape[0] - size_patch):
-                        for l in range(Ismp.shape[1] - size_patch):
-                            if patch_similarity(Ismp[k:k+size_patch,l:l+size_patch], image_result[random_voisin[0]-int(size_patch/2):random_voisin[0]+int(size_patch/2),random_voisin[1]-int(size_patch/2):random_voisin[1]+int(size_patch/2)], epsilon):
-                                patches_similaires.append((k,l))
-                    # On choisit un patch similaire au hasard
-                    if len(patches_similaires) != 0:
-                        random_patch_similaire = random.choice(patches_similaires)
-                        image_result[i,j] = Ismp[random_patch_similaire[0],random_patch_similaire[1]]'''
-
-    print("Indices ij pixel max voisin : ", max_i, ", ", max_j)  
-    print("Valeur pixel : ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0])        
+                
+    #print("Indices ij pixel max voisin : ", max_i, ", ", max_j)  
+    #print("Valeur pixel : ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0])        
     patch_pixel = extract_patch(image_result, size_patch, max_i, max_j)
     # Parcourir tous les pixels de l'image de textures pour comparer avec le patch_pixel
     offset = int((size_patch - 1)/2)
     omegap = []
     #print("Taille de la texture", Ismp.shape)
+    best_diff = 255
+    best_patch = random_patch(Ismp, size_patch)
     for o in range(offset, Ismp.shape[0] - offset):
         for p in range(offset, Ismp.shape[1] - offset):
             patch_compare = extract_patch(Ismp, size_patch, o, p)
-            if patch_similarity(patch_pixel, patch_compare, epsilon):
-                #print("Patch similaire trouvé")
+            similarity = patch_similarity(patch_pixel, patch_compare)
+            if similarity <= epsilon:
                 omegap.append(patch_compare)
+            else :
+                if similarity < best_diff :
+                    best_diff = similarity
+                    best_patch = patch_compare
+            '''if patch_similarity(patch_pixel, patch_compare, epsilon):
+                #print("Patch similaire trouvé")
+                omegap.append(patch_compare)'''
+    #print("taille omegap :", len(omegap))
     if omegap != []:
         random_omegap = random.choice(omegap)
+        #print("omega_map : ", random_omegap)
         #image_result[max_i - offset:max_i + offset, max_j - offset:max_j + offset] = random_omegap
         image_result[max_j, max_i] = random_omegap[offset + 1, offset + 1]
+        #print("pixel dans omega_map : ", random_omegap[offset + 1, offset + 1])
+        #pixels_ecrits = pixels_ecrits + 1
+    else:
+        #print("pas de match dans texture :  [", max_j, ", ", max_i, "]")
+        #no_liste.append([max_j, max_i])
+        image_result[max_j, max_i] = best_patch[offset + 1, offset + 1]
     return image_result
 
 
-final = image_initiale(text0, 100, 10)
-final = efros_leung(text0, 100, 10, 15, final)
-for i in range (0, 10):
+final = image_initiale(text0, 20, 10)
+final = efros_leung(text0, 20, 10, 15, final)
+for i in range (0, 400):
     #probleme : y'a que 3 pixels
-    final = efros_leung(text0, 100, 10, 15, final)
+    final = efros_leung(text0, 20, 10, 15, final)
+    #print("pixels ecrits : ", pixels_ecrits)
 final = Image.fromarray(final.astype('uint8'))
 final.show()
 
