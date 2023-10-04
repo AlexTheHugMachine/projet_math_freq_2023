@@ -14,9 +14,10 @@ text6 = Image.open("textures_data/text6.png")
 
 #%%
 
-#text0.show()
-#text1bis = np.array(text1)
-#print(text1bis.shape)
+taille_im = 15
+taille_patch = 10
+mask = np.full((taille_im, taille_im), 0, dtype=np.uint8)
+nv = np.full((taille_im, taille_im), 0, dtype=np.uint8)
 
 def ssd_pixel(pixel1, pixel2):
     difference = pixel1 - pixel2
@@ -39,13 +40,14 @@ def patch_similarity(patch1, patch2):
                 diffG += abs(patch1[i,j,1] - patch2[i,j,1])
                 diffB += abs(patch1[i,j,2] - patch2[i,j,2])
                 nbpix += 1
-    if nbpix == 0:
-        nbpix = 1
-    return ((diffR/nbpix) + (diffG/nbpix) + (diffB/nbpix)) / 3
+    if nbpix != 0:
+        return ((diffR/nbpix) + (diffG/nbpix) + (diffB/nbpix)) / 3
     '''
     if diffR/nbpix < epsilon and diffG/nbpix < epsilon and diffB/nbpix < epsilon:
         return True
     else: return False'''
+
+#ajouter une comparaison de distance différente (SSD) pour voir la différence
 
 def random_patch(Ismp, size_patch):
     Ismp = np.array(Ismp)
@@ -65,14 +67,22 @@ def extract_patch(image, size, i_centre, j_centre):
     return patch
 
 def image_initiale(Ismp, size_final, size_patch):
+    global mask
+    global nv
     image_result = np.full((size_final, size_final, 3), -1, dtype=np.int32)
     Ismp = np.array(Ismp)
     random.seed()
+    r = int(size_patch/2)
     new_patch_random = random_patch(Ismp, size_patch)
     # Trouver le milieu de image_vide
     milieu = (int(size_final/2), int(size_final/2))
     # Coller le patch au milieu de image_vide en gardant les contours inchangés
-    image_result[milieu[0] - int(size_patch/2):milieu[0] + int(size_patch/2), milieu[1] - int(size_patch/2):milieu[1] + int(size_patch/2)] = new_patch_random
+    image_result[milieu[1] - r:milieu[1] + r, milieu[0] - r:milieu[0] + r] = new_patch_random
+    mask[milieu[1] - r:milieu[1] + r, milieu[0] - r:milieu[0] + r] = 1
+    '''for i in range(milieu[0] - r, milieu[0] + r + 1) :
+        for j in range(milieu[1] - r, milieu[1] + r + 1) :
+            compte_voisins(j, i)'''
+    nv[milieu[1]-r : milieu[1]+r+1 , milieu[0]-r : milieu[0]+r+1] += 1
     return image_result
 
 #Efros-Leung :
@@ -80,9 +90,11 @@ def image_initiale(Ismp, size_final, size_patch):
 # size_final : taille finale de l' image générée
 # size_patch : la taille des patch que l'on utilisera (reste impair)
 # epsilon : coef pour definir a quel point l'echantillon observé peut varier de son sample
+# mask : tableau de booleen de taille size_final x size_final
+# neighbors : tableau de taille size_final x size_final qui contient le nb de voisins remplis du pixel
 def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
-    #image_result = np.uint8(np.full((size_final, size_final,3),-1))
-    #image_result = np.full((size_final, size_final, 3), -1, dtype=np.int32)
+    global mask
+    global nv
     Ismp = np.array(Ismp)
     #random.seed()
     #new_patch_random = random_patch(Ismp, size_patch)
@@ -92,27 +104,24 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
     #image_result[milieu[0] - int(size_patch/2):milieu[0] + int(size_patch/2), milieu[1] - int(size_patch/2):milieu[1] + int(size_patch/2)] = new_patch_random
     #Trouver le pixel de image_result qui possède le plus de voisins non vides
     #Pour chaque pixel de image_result, on regarde si il est vide ou non
-    max_voisins = -1
+
+    #trouver pixel non rempli avec plus petite valeur
+    indice_maximum_voisins = np.argmax(np.multiply((1 - mask), nv))
+    max_i = np.unravel_index(indice_maximum_voisins, (size_final, size_final))[1]
+    max_j = np.unravel_index(indice_maximum_voisins, (size_final, size_final))[0]
+
+    '''max_voisins = -1
     max_i = -1
     max_j = -1
     for i in range(size_final):
         for j in range(size_final):
-            #if [j, i] not in no_liste:
-            # Creer une image de booleen pour savoir lequel est rempli
-            if image_result[j,i,0] == -1 :
-                #On regarde si il y a des voisins non vides
-                voisins = []
-                for k in range(i-1,i+1):
-                    for l in range(j-1, j+1):
-                        if k >= 0 and k < size_final and l >= 0 and l < size_final:
-                            if image_result[l, k,0] != -1 :
-                                voisins.append((k,l))
-                #On choisit un voisin au hasard
-                if len(voisins) > max_voisins:
-                    max_voisins = len(voisins)
+            if mask[j,i] == 0 :
+                if nv[j,i] > max_voisins:
+                    max_voisins = nv[j,i]
                     max_i = i
-                    max_j = j
-                    #print(max_i, max_j)
+                    max_j = j'''
+
+    
                 
     #print("Indices ij pixel max voisin : ", max_i, ", ", max_j)  
     #print("Valeur pixel : ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0], ", ", image_result[max_j, max_i, 0])        
@@ -137,25 +146,35 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
                 #print("Patch similaire trouvé")
                 omegap.append(patch_compare)'''
     #print("taille omegap :", len(omegap))
+    #print(nv[max_j, max_i])
     if omegap != []:
         random_omegap = random.choice(omegap)
-        #print("omega_map : ", random_omegap)
-        #image_result[max_i - offset:max_i + offset, max_j - offset:max_j + offset] = random_omegap
         image_result[max_j, max_i] = random_omegap[offset + 1, offset + 1]
-        #print("pixel dans omega_map : ", random_omegap[offset + 1, offset + 1])
-        #pixels_ecrits = pixels_ecrits + 1
+        mask[max_j, max_i] = 1
+        if(max_i == 0 and max_j == 0):
+            nv[max_j:max_j+offset+1, max_i:max_i+offset+1] += 1
+        elif(max_i == 0):
+            nv[max_j-offset:max_j+offset+1, max_i:max_i+offset+1] += 1
+        elif(max_j == 0):
+            nv[max_j:max_j+offset+1, max_i-offset:max_i+offset+1] += 1
+        else:
+        #compte_voisins(max_j, max_i)
+            nv[max_j-offset : max_j+offset+1 , max_i-offset : max_i+offset+1] += 1
+        #print("nv après : ", nv[max_j, max_i])
     else:
         #print("pas de match dans texture :  [", max_j, ", ", max_i, "]")
         #no_liste.append([max_j, max_i])
         image_result[max_j, max_i] = best_patch[offset + 1, offset + 1]
+        mask[max_j, max_i] = 1
+        #compte_voisins(max_j, max_i)
+        nv[max_j-offset : max_j+offset+1 , max_i-offset : max_i+offset+1] += 1
     return image_result
 
-
-final = image_initiale(text0, 20, 10)
-final = efros_leung(text0, 20, 10, 15, final)
-for i in range (0, 400):
+final = image_initiale(text0, taille_im, taille_patch)
+#final = efros_leung(text0, 20, 10, 15, final)
+for i in range (0, (taille_im*taille_im) - (taille_patch*taille_patch)):
     #probleme : y'a que 3 pixels
-    final = efros_leung(text0, 20, 10, 15, final)
+    final = efros_leung(text0, taille_im, taille_patch, 15, final)
     #print("pixels ecrits : ", pixels_ecrits)
 final = Image.fromarray(final.astype('uint8'))
 final.show()
