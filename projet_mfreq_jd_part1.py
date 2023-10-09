@@ -14,7 +14,7 @@ text6 = Image.open("textures_data/text6.png")
 
 #%%
 
-taille_im = 15
+taille_im = 40
 taille_patch = 10
 mask = np.full((taille_im, taille_im), 0, dtype=np.uint8)
 nv = np.full((taille_im, taille_im), 0, dtype=np.uint8)
