@@ -14,7 +14,7 @@ text6 = Image.open("textures_data/text6.png")
 
 #%%
 
-taille_im = 40
+taille_im = 60
 taille_patch = 10
 mask = np.full((taille_im, taille_im), 0, dtype=np.uint8)
 nv = np.full((taille_im, taille_im), 0, dtype=np.uint8)
@@ -28,20 +28,21 @@ def ssd_pixel(pixel1, pixel2):
 # donc tester le nombre de channel et traiter l'image en fonction
 # Paramètres : (Ismp, size_final, taille_patch (doit etre impair), epsilon)
 # Définir une fonction pour calculer la similarité entre deux patches
+
 def patch_similarity(patch1, patch2):
-    diffR = 0
-    diffG = 0
-    diffB = 0
-    nbpix = 0
-    for i in range(patch1.shape[0]):
-        for j in range(patch1.shape[1]):
-            if patch1[i,j,0] != -1 and patch2[i,j,0] != -1:
-                diffR += abs(patch1[i,j,0] - patch2[i,j,0])
-                diffG += abs(patch1[i,j,1] - patch2[i,j,1])
-                diffB += abs(patch1[i,j,2] - patch2[i,j,2])
-                nbpix += 1
-    if nbpix != 0:
-        return ((diffR/nbpix) + (diffG/nbpix) + (diffB/nbpix)) / 3
+    valid_indices = (patch1[..., 0] != -1) & (patch2[..., 0] != -1)
+    
+    valid_pixels_patch1 = patch1[valid_indices]
+    valid_pixels_patch2 = patch2[valid_indices]
+    
+    if valid_pixels_patch1.size == 0:
+        return 0.0
+    
+    diff_rgb = np.abs(valid_pixels_patch1 - valid_pixels_patch2)
+    diff_sum = np.sum(diff_rgb, axis=1)
+    
+    return np.mean(diff_sum) / 3.0
+
     '''
     if diffR/nbpix < epsilon and diffG/nbpix < epsilon and diffB/nbpix < epsilon:
         return True
@@ -59,11 +60,20 @@ def random_patch(Ismp, size_patch):
 
 def extract_patch(image, size, i_centre, j_centre):
     patch = np.full((size, size, 3), -1, dtype=np.int32)
-    offset = int(size/2)
-    for i in range(-offset, offset):
-        for j in range(-offset, offset):
-            if i_centre + i >= 0 and i_centre + i < image.shape[0] and j_centre + j >= 0 and j_centre + j < image.shape[1]:
-                patch[offset + j, offset + i] = image[j_centre + j, i_centre + i]
+    offset = size // 2
+    
+    i_min = max(0, i_centre - offset)
+    i_max = min(image.shape[0], i_centre + offset)
+    j_min = max(0, j_centre - offset)
+    j_max = min(image.shape[1], j_centre + offset)
+    
+    patch_start_i = offset - min(i_centre, offset)
+    patch_end_i = patch_start_i + (i_max - i_min)
+    patch_start_j = offset - min(j_centre, offset)
+    patch_end_j = patch_start_j + (j_max - j_min)
+    
+    patch[patch_start_j:patch_end_j, patch_start_i:patch_end_i] = image[j_min:j_max, i_min:i_max]
+    
     return patch
 
 def image_initiale(Ismp, size_final, size_patch):
@@ -173,9 +183,11 @@ def efros_leung(Ismp, size_final, size_patch, epsilon, image_result):
 final = image_initiale(text0, taille_im, taille_patch)
 #final = efros_leung(text0, 20, 10, 15, final)
 for i in range (0, (taille_im*taille_im) - (taille_patch*taille_patch)):
+#for i in np.arange(0, (taille_im*taille_im) - (taille_patch*taille_patch), 1):
     #probleme : y'a que 3 pixels
-    final = efros_leung(text0, taille_im, taille_patch, 15, final)
+    final = efros_leung(text0, taille_im, taille_patch, 10, final)
     #print("pixels ecrits : ", pixels_ecrits)
+    #print("iteration : ", i)
 final = Image.fromarray(final.astype('uint8'))
 final.show()
 
